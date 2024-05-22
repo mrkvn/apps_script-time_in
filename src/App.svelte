@@ -1,15 +1,31 @@
 <script lang="ts">
     import run from "$lib/api";
     import { Button } from "$lib/components/ui/button";
+    import { Input } from "$lib/components/ui/input/index.js";
+    import { LoaderCircle } from "lucide-svelte/icons";
     import { onDestroy, onMount } from "svelte";
     import { Toaster, toast } from "svelte-sonner";
+    import { z } from "zod";
 
     let currentDateTime: string;
-    let email = "Fetching email...";
+    let employeeId = "";
+    let isInLoading = false;
+    let isOutLoading = false;
+    let time = "";
+    let clockAction = "";
+    let formErrors: FormErrors = {};
+
+    type FormErrors = {
+        [key: string]: string;
+    };
+    // Define the form schema using Zod
+    const formSchema = z.object({
+        employeeId: z.string().min(1, "Required"),
+    });
 
     // Initialize the date and time when the component is mounted
     onMount(() => {
-        getUserEmail();
+        // getUserEmail();
         updateDateTime();
         const interval = setInterval(updateDateTime, 1000); // Update every second
 
@@ -18,17 +34,6 @@
             clearInterval(interval);
         });
     });
-    async function getUserEmail() {
-        try {
-            email = await run("getUserEmail", []);
-            console.log("------email-------", email);
-        } catch (error) {
-            console.error(error);
-            console.log("------email-------", email);
-            email = "Unavailable Google account. Try to login to Google.";
-            toast.error("Cannot determine Google account.");
-        }
-    }
 
     // Function to format the date and time
     function formatDateTime(date: Date) {
@@ -48,38 +53,118 @@
         currentDateTime = formatDateTime(new Date());
     }
 
-    // let routes = {
-    //     "/": Home,
-    //     "/about": About,
-    //     "*": NotFound,
-    // };
-    // async function handleClick() {
-    //     res = await runGas("echo", ["Hello from Svelte!"]);
-    // }
     async function clock(action: string) {
+        time = "";
+        clockAction = action;
         try {
-            await run("clock", [action]);
-            toast.success("Success.");
+            const validation = validateForm({ employeeId });
+            if (validation.valid) {
+                formErrors = {};
+                if (action === "in") {
+                    isInLoading = true;
+                } else {
+                    isOutLoading = true;
+                }
+                time = await run("clock", [action, employeeId]);
+                toast.success("Success.");
+                isInLoading = false;
+                isOutLoading = false;
+            } else {
+                formErrors = validation.errors as FormErrors;
+
+                console.log("Form validation errors:", formErrors);
+                // Handle form errors here
+            }
         } catch (error) {
+            formErrors = {};
             console.error(error);
             toast.error("Something went wrong.");
         }
+    }
+
+    // Function to validate the form
+    function validateForm(data: any) {
+        try {
+            formSchema.parse(data);
+            return { valid: true, errors: {} };
+        } catch (e) {
+            if (e instanceof z.ZodError) {
+                return {
+                    valid: false,
+                    errors: e.errors.reduce((acc: FormErrors, error) => {
+                        if (error.path.length > 0) {
+                            acc[error.path[0]] = error.message;
+                        }
+                        return acc;
+                    }, {}),
+                };
+            }
+        }
+        return {
+            valid: false,
+            errors: {},
+        };
     }
 </script>
 
 <Toaster position="top-center" expand={true} richColors />
 <main class="container mx-auto">
-    <div class="flex flex-col items-center pt-40 text-center">
-        <p class="text-sm sm:text-base md:text-lg">Email: {email}</p>
+    <div class="flex flex-col items-center pt-40 text-center gap-4">
         <h1 class="text-lg sm:text-4xl md:text-5xl font-bold">
             {currentDateTime}
         </h1>
-        <div class="flex gap-8 mt-4 md:mt-8">
-            <Button class="w-14 md:w-20" on:click={() => clock("in")}>In</Button
-            >
-            <Button class="w-14 md:w-20" on:click={() => clock("out")}
-                >Out</Button
-            >
-        </div>
+        <form on:submit|preventDefault class="mt-4 md:mt-8 flex flex-col gap-8">
+            <div class="flex flex-col text-left gap-2">
+                <Input
+                    type="text"
+                    placeholder="Employee ID"
+                    class="max-w-xs"
+                    bind:value={employeeId}
+                    autofocus
+                />
+                {#if formErrors.employeeId}
+                    <span class="error text-red-500 text-xs pl-2"
+                        >{formErrors.employeeId}</span
+                    >
+                {/if}
+            </div>
+            <div class="flex gap-8 justify-center">
+                {#if isInLoading}
+                    <Button class="w-14 md:w-20" disabled>
+                        <LoaderCircle class="h-4 w-4 animate-spin" />
+                    </Button>
+                {:else if isOutLoading}
+                    <Button
+                        class="w-14 md:w-20"
+                        disabled
+                        on:click={() => clock("in")}>In</Button
+                    >
+                {:else}
+                    <Button class="w-14 md:w-20" on:click={() => clock("in")}
+                        >In</Button
+                    >
+                {/if}
+                {#if isOutLoading}
+                    <Button class="w-14 md:w-20" disabled>
+                        <LoaderCircle class="h-4 w-4 animate-spin" />
+                    </Button>
+                {:else if isInLoading}
+                    <Button
+                        class="w-14 md:w-20"
+                        disabled
+                        on:click={() => clock("out")}>Out</Button
+                    >
+                {:else}
+                    <Button class="w-14 md:w-20" on:click={() => clock("out")}
+                        >Out</Button
+                    >
+                {/if}
+            </div>
+        </form>
+        {#if time}
+            <h2 class="font-bold text-xl text-green-600 mt-12">
+                Successfully clocked {clockAction} @ {time}
+            </h2>
+        {/if}
     </div>
 </main>

@@ -3,6 +3,7 @@ function doGet() {
         .evaluate()
         .addMetaTag("viewport", "width=device-width, initial-scale=1");
 }
+
 // CONSTANTS
 TIMESHEET_TABLE = "timesheet";
 
@@ -51,19 +52,10 @@ function getCurrentDateTimeDay() {
     };
 }
 
-function getUserEmail() {
-    const user = Session.getActiveUser();
-    const email = user.getEmail();
-    const loginId = user.getUserLoginId();
-    const username = user.getUsername();
-    return { email, loginId, username };
-    // return Session.getActiveUser().getEmail();
-}
-
-function clock(action) {
-    const email = getUserEmail();
+function clock(action, employee_id) {
+    const key = Session.getTemporaryActiveUserKey();
     const { date, time, day } = getCurrentDateTimeDay();
-    data = { id: UUID(), type: action, email, time, date, day };
+    data = { id: UUID(), type: action, employee_id, time, date, day, key };
     const sheet =
         SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMESHEET_TABLE);
 
@@ -86,5 +78,5 @@ function clock(action) {
 
     // Append the new row to the sheet
     sheet.appendRow(newRow);
-    return data["id"];
+    return data["time"];
 }
