@@ -14,6 +14,9 @@
     let time = "";
     let clockAction = "";
     let formErrors: FormErrors = {};
+    let locationMessage = "";
+    let lat = 0;
+    let lng = 0;
 
     type FormErrors = {
         [key: string]: string;
@@ -29,11 +32,42 @@
         updateDateTime();
         const interval = setInterval(updateDateTime, 1000); // Update every second
 
+        getLocation();
+
         // Clear the interval when the component is destroyed
         onDestroy(() => {
             clearInterval(interval);
         });
     });
+
+    function getLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(showPosition, showError);
+        } else {
+            locationMessage = "Geolocation is not supported by this browser.";
+        }
+    }
+    async function showPosition(position: GeolocationPosition) {
+        lat = position.coords.latitude;
+        lng = position.coords.longitude;
+    }
+
+    function showError(error: GeolocationPositionError) {
+        switch (error.code) {
+            case error.PERMISSION_DENIED:
+                locationMessage = "User denied the request for Geolocation.";
+                break;
+            case error.POSITION_UNAVAILABLE:
+                locationMessage = "Location information is unavailable.";
+                break;
+            case error.TIMEOUT:
+                locationMessage = "The request to get user location timed out.";
+                break;
+            default:
+                locationMessage = "An unknown error occurred.";
+                break;
+        }
+    }
 
     // Function to format the date and time
     function formatDateTime(date: Date) {
@@ -65,7 +99,7 @@
                 } else {
                     isOutLoading = true;
                 }
-                time = await run("clock", [action, employeeId]);
+                time = await run("clock", [action, employeeId, lat, lng]);
                 toast.success("Success.");
                 isInLoading = false;
                 isOutLoading = false;
