@@ -5,89 +5,31 @@ function doGet() {
 }
 
 // CONSTANTS
-TIMESHEET_TABLE = "timesheet";
+const TIMESHEET_API_URL = "CHANGE_ME";
 
-/**
- * Returns a UUID.
- * @return UUID.
- * @customfunction
- */
-function UUID() {
-    return Utilities.getUuid();
-}
-
-function getCurrentDateTimeDay() {
-    const now = new Date();
-
-    // Format the current date
-    const formattedDate = Utilities.formatDate(
-        now,
-        Session.getScriptTimeZone(),
-        "yyyy-MM-dd"
-    );
-
-    // Format the current time
-    const formattedTime = Utilities.formatDate(
-        now,
-        Session.getScriptTimeZone(),
-        "HH:mm:ss"
-    );
-
-    // Get the day of the week
-    const days = [
-        "Sunday",
-        "Monday",
-        "Tuesday",
-        "Wednesday",
-        "Thursday",
-        "Friday",
-        "Saturday",
-    ];
-    const dayOfWeek = days[now.getDay()];
-
-    return {
-        date: formattedDate,
-        time: formattedTime,
-        day: dayOfWeek,
-    };
+function getUserEmail() {
+    return Session.getActiveUser().getEmail();
 }
 
 function clock(action, employee_id, latitude, longitude) {
-    const key = Session.getTemporaryActiveUserKey();
-    const { date, time, day } = getCurrentDateTimeDay();
-    data = {
-        id: UUID(),
-        type: action,
-        employee_id,
-        time,
-        date,
-        day,
-        key,
-        latitude,
-        longitude,
-        lat_long: `${latitude} ${longitude}`,
+    const email = Session.getActiveUser().getEmail();
+    const url = TIMESHEET_API_URL;
+    const payload = {
+        function: "clock",
+        args: {
+            action,
+            employee_id,
+            latitude,
+            longitude,
+            email,
+        },
     };
-    const sheet =
-        SpreadsheetApp.getActiveSpreadsheet().getSheetByName(TIMESHEET_TABLE);
+    const options = {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(payload),
+    };
+    const response = UrlFetchApp.fetch(url, options);
 
-    // Get all data in the sheet
-    const sheetData = sheet.getDataRange().getValues();
-
-    // Get the header row
-    const headers = sheetData[0];
-
-    // Create a new row array with the same length as headers
-    const newRow = new Array(headers.length).fill("");
-
-    // Populate the new row with data from the object
-    for (let key in data) {
-        const columnIndex = headers.indexOf(key);
-        if (columnIndex !== -1) {
-            newRow[columnIndex] = data[key];
-        }
-    }
-
-    // Append the new row to the sheet
-    sheet.appendRow(newRow);
-    return data["time"];
+    return response.getContentText();
 }

@@ -1,14 +1,11 @@
 <script lang="ts">
     import run from "$lib/api";
     import { Button } from "$lib/components/ui/button";
-    import { Input } from "$lib/components/ui/input/index.js";
     import { LoaderCircle } from "lucide-svelte/icons";
     import { onDestroy, onMount } from "svelte";
     import { Toaster, toast } from "svelte-sonner";
-    import { z } from "zod";
 
     let currentDateTime: string;
-    let employeeId = "";
     let isInLoading = false;
     let isOutLoading = false;
     let time = "";
@@ -17,18 +14,15 @@
     let locationMessage = "";
     let lat = 0;
     let lng = 0;
+    let email = "Fetching email...";
 
     type FormErrors = {
         [key: string]: string;
     };
-    // Define the form schema using Zod
-    const formSchema = z.object({
-        employeeId: z.string().min(1, "Required"),
-    });
 
     // Initialize the date and time when the component is mounted
     onMount(() => {
-        // getUserEmail();
+        getUserEmail();
         updateDateTime();
         const interval = setInterval(updateDateTime, 1000); // Update every second
 
@@ -39,6 +33,16 @@
             clearInterval(interval);
         });
     });
+
+    async function getUserEmail() {
+        try {
+            email = await run("getUserEmail", []);
+        } catch (error) {
+            console.error(error);
+            email = "Not Available.";
+            toast.error("Your email cannot be identified at this time.");
+        }
+    }
 
     function getLocation() {
         if (navigator.geolocation) {
@@ -91,53 +95,21 @@
         time = "";
         clockAction = action;
         try {
-            const validation = validateForm({ employeeId });
-            if (validation.valid) {
-                formErrors = {};
-                if (action === "in") {
-                    isInLoading = true;
-                } else {
-                    isOutLoading = true;
-                }
-                time = await run("clock", [action, employeeId, lat, lng]);
-                toast.success("Success.");
-                isInLoading = false;
-                isOutLoading = false;
+            formErrors = {};
+            if (action === "in") {
+                isInLoading = true;
             } else {
-                formErrors = validation.errors as FormErrors;
-
-                console.log("Form validation errors:", formErrors);
-                // Handle form errors here
+                isOutLoading = true;
             }
+            time = await run("clock", [action, lat, lng]);
+            toast.success("Success.");
+            isInLoading = false;
+            isOutLoading = false;
         } catch (error) {
             formErrors = {};
             console.error(error);
             toast.error("Something went wrong.");
         }
-    }
-
-    // Function to validate the form
-    function validateForm(data: any) {
-        try {
-            formSchema.parse(data);
-            return { valid: true, errors: {} };
-        } catch (e) {
-            if (e instanceof z.ZodError) {
-                return {
-                    valid: false,
-                    errors: e.errors.reduce((acc: FormErrors, error) => {
-                        if (error.path.length > 0) {
-                            acc[error.path[0]] = error.message;
-                        }
-                        return acc;
-                    }, {}),
-                };
-            }
-        }
-        return {
-            valid: false,
-            errors: {},
-        };
     }
 </script>
 
@@ -148,20 +120,7 @@
             {currentDateTime}
         </h1>
         <form on:submit|preventDefault class="mt-4 md:mt-8 flex flex-col gap-8">
-            <div class="flex flex-col text-left gap-2">
-                <Input
-                    type="text"
-                    placeholder="Employee ID"
-                    class="max-w-xs"
-                    bind:value={employeeId}
-                    autofocus
-                />
-                {#if formErrors.employeeId}
-                    <span class="error text-red-500 text-xs pl-2"
-                        >{formErrors.employeeId}</span
-                    >
-                {/if}
-            </div>
+            <p>Email: {email}</p>
             <div class="flex gap-8 justify-center">
                 {#if isInLoading}
                     <Button class="w-14 md:w-20" disabled>
